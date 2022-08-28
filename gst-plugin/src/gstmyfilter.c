@@ -259,7 +259,7 @@ gst_my_filter_chain (GstPad * pad, GstObject * parent, GstBuffer * buf)
   filter = GST_MYFILTER (parent);
   gint width, height; 
   gint stride;
-  gint h, w;
+  //gint h, w;
 
    if( gst_video_frame_map(&frame, vinfo, buf, GST_MAP_WRITE) == TRUE){
 
@@ -267,7 +267,7 @@ gst_my_filter_chain (GstPad * pad, GstObject * parent, GstBuffer * buf)
      uint8_t *pixels = GST_VIDEO_FRAME_PLANE_DATA( &frame, 0);
 
      stride = GST_VIDEO_FRAME_PLANE_STRIDE( &frame, 0);
-     guint pixel_stride = GST_VIDEO_FRAME_COMP_PSTRIDE( &frame, 0);
+     //guint pixel_stride = GST_VIDEO_FRAME_COMP_PSTRIDE( &frame, 0);
      width = GST_VIDEO_INFO_WIDTH( vinfo); 
      height = GST_VIDEO_INFO_HEIGHT( vinfo); 
 
@@ -276,7 +276,7 @@ gst_my_filter_chain (GstPad * pad, GstObject * parent, GstBuffer * buf)
 	g_print("We have a width: %d\n",width );
 	g_print("We have a height: %d\n",height ); 
         */ 
-        float sigma = 2.0;
+        float sigma = 10;
         float epsilon = 0.001;	
         
      /*SimdGaussianBlur3x3((const uint8_t*) pixels 

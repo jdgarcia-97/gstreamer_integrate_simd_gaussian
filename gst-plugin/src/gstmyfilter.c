@@ -87,7 +87,9 @@ enum
 enum
 {
   PROP_0,
-  PROP_SILENT
+  PROP_SILENT,
+  PROP_SIGMA,
+  PROP_EPSILON
 };
 
 /* the capabilities of the inputs and outputs.
@@ -141,10 +143,18 @@ gst_my_filter_class_init (GstMyFilterClass * klass)
       g_param_spec_boolean ("silent", "Silent", "Produce verbose output ?",
           FALSE, G_PARAM_READWRITE));
 
+  g_object_class_install_property (gobject_class, PROP_SIGMA,
+      g_param_spec_float("sigma", "Sigma", "Pass in a sigma value",
+          -2.00, 20.0, 1.0, G_PARAM_READWRITE)); 
+
+  g_object_class_install_property (gobject_class, PROP_EPSILON, 
+      g_param_spec_float("epsilon", "Epsilon", "Pass in an epsilon value",
+          0.0001, 10, 0.001, G_PARAM_READWRITE));
+
   gst_element_class_set_details_simple (gstelement_class,
       "MyFilter",
       "FIXME:Generic",
-      "FIXME:Generic Template Element", "maya <<user@hostname.org>>");
+      "FIXME:Generic Template Element", "jdgarcia97@proton.me");
 
   gst_element_class_add_pad_template (gstelement_class,
       gst_static_pad_template_get (&src_factory));
@@ -163,15 +173,19 @@ gst_my_filter_init (GstMyFilter * filter)
   filter->sinkpad = gst_pad_new_from_static_template (&sink_factory, "sink");
   gst_pad_set_event_function (filter->sinkpad,
       GST_DEBUG_FUNCPTR (gst_my_filter_sink_event));
+
   gst_pad_set_chain_function (filter->sinkpad,
       GST_DEBUG_FUNCPTR (gst_my_filter_chain));
+
   GST_PAD_SET_PROXY_CAPS (filter->sinkpad);
   gst_element_add_pad (GST_ELEMENT (filter), filter->sinkpad);
 
   filter->srcpad = gst_pad_new_from_static_template (&src_factory, "src");
   GST_PAD_SET_PROXY_CAPS (filter->srcpad);
   gst_element_add_pad (GST_ELEMENT (filter), filter->srcpad);
-
+ 
+  filter->sigma = 0.0;
+  filter->epsilon = 0.001; 
   filter->silent = FALSE;
 }
 
@@ -184,7 +198,14 @@ gst_my_filter_set_property (GObject * object, guint prop_id,
   switch (prop_id) {
     case PROP_SILENT:
       filter->silent = g_value_get_boolean (value);
+      g_print("Silent argument was changed to %s\n", filter->silent ? "true" : "false");
       break;
+    case PROP_SIGMA:
+      filter->sigma = g_value_get_float(value);  // Set the sigma value the user passes in.
+      break;
+    case PROP_EPSILON:
+      filter->epsilon = g_value_get_float(value);
+      break; 
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
       break;
@@ -201,6 +222,13 @@ gst_my_filter_get_property (GObject * object, guint prop_id,
     case PROP_SILENT:
       g_value_set_boolean (value, filter->silent);
       break;
+    case PROP_SIGMA:
+      g_value_set_float(value, filter->sigma);
+      break; 
+    case PROP_EPSILON:
+      g_value_set_float(value, filter->epsilon);
+      break;
+
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
       break;
@@ -250,7 +278,6 @@ gst_my_filter_chain (GstPad * pad, GstObject * parent, GstBuffer * buf)
   GstMyFilter *filter;
   GstVideoFrame frame; 
   GstVideoInfo *vinfo = gst_video_info_new();
-  //GstVideoInfo *vinfo;
   gst_video_info_init(vinfo);
 
   GstCaps *caps = gst_pad_get_current_caps(pad);
@@ -263,11 +290,11 @@ gst_my_filter_chain (GstPad * pad, GstObject * parent, GstBuffer * buf)
 
    if( gst_video_frame_map(&frame, vinfo, buf, GST_MAP_WRITE) == TRUE){
 
-     //guint8 *pixels = GST_VIDEO_FRAME_PLANE_DATA( &frame, 0);
-     uint8_t *pixels = GST_VIDEO_FRAME_PLANE_DATA( &frame, 0);
+     uint8_t *pixels_y = GST_VIDEO_FRAME_COMP_DATA( &frame, 0);
+     uint8_t *pixels_u = GST_VIDEO_FRAME_COMP_DATA( &frame, 1);
+     uint8_t *pixels_v = GST_VIDEO_FRAME_COMP_DATA( &frame, 2);
 
      stride = GST_VIDEO_FRAME_PLANE_STRIDE( &frame, 0);
-     //guint pixel_stride = GST_VIDEO_FRAME_COMP_PSTRIDE( &frame, 0);
      width = GST_VIDEO_INFO_WIDTH( vinfo); 
      height = GST_VIDEO_INFO_HEIGHT( vinfo); 
 
@@ -276,28 +303,17 @@ gst_my_filter_chain (GstPad * pad, GstObject * parent, GstBuffer * buf)
 	g_print("We have a width: %d\n",width );
 	g_print("We have a height: %d\n",height ); 
         */ 
-        float sigma = 10;
-        float epsilon = 0.001;	
+        float sigma = filter->sigma;
+        float epsilon = filter->epsilon;	
         
-     /*SimdGaussianBlur3x3((const uint8_t*) pixels 
-		       ,(size_t) stride
-	               ,(size_t) width
-	               ,(size_t) height 
-		       ,(size_t) 3
-		       ,(uint8_t *) pixels
-		       ,(size_t) stride );	 
-       */ 	
-        void *filter = SimdGaussianBlurInit( (size_t) width
-			,(size_t) height
-			,(size_t) 3
-			,&sigma
-			,&epsilon);
+
+
+
+        void *filter = SimdGaussianBlurInit( (size_t) width ,(size_t) height ,(size_t) 3 ,&sigma ,&epsilon);
         
-	SimdGaussianBlurRun( filter
-			,pixels
-		        ,(size_t) stride
-			,pixels
-			,(size_t) stride);	  
+	SimdGaussianBlurRun( filter,pixels_y ,(size_t) stride , pixels_y ,(size_t) stride);	   
+	SimdGaussianBlurRun( filter,pixels_u ,(size_t) stride , pixels_u ,(size_t) stride);	   
+	SimdGaussianBlurRun( filter,pixels_v ,(size_t) stride , pixels_v ,(size_t) stride);	   
 
 
 	/*for( h = 0; h < height; ++h){

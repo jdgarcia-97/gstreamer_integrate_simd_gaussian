@@ -59,6 +59,9 @@ struct _GstMyFilter
 {
   GstElement element;
   gint width, height, stride;
+  gfloat sigma;
+  gfloat epsilon; 
+
 
   GstPad *sinkpad, *srcpad;
 

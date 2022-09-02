@@ -184,9 +184,6 @@ gst_my_filter_init (GstMyFilter * filter)
   GST_PAD_SET_PROXY_CAPS (filter->srcpad);
   gst_element_add_pad (GST_ELEMENT (filter), filter->srcpad);
  
-  filter->sigma = 0.0;
-  filter->epsilon = 0.001; 
-  filter->silent = FALSE;
 }
 
 static void
@@ -285,35 +282,59 @@ gst_my_filter_chain (GstPad * pad, GstObject * parent, GstBuffer * buf)
 
   filter = GST_MYFILTER (parent);
   gint width, height; 
-  gint stride;
-  //gint h, w;
+  gint stride_y;
+  gint stride_u;
+  gint stride_v;
 
    if( gst_video_frame_map(&frame, vinfo, buf, GST_MAP_WRITE) == TRUE){
 
-     uint8_t *pixels_y = GST_VIDEO_FRAME_COMP_DATA( &frame, 0);
+     uint8_t *pixels_y = GST_VIDEO_FRAME_COMP_DATA( &frame, 0); 
      uint8_t *pixels_u = GST_VIDEO_FRAME_COMP_DATA( &frame, 1);
-     uint8_t *pixels_v = GST_VIDEO_FRAME_COMP_DATA( &frame, 2);
+     uint8_t *pixels_v = GST_VIDEO_FRAME_COMP_DATA( &frame, 2); 
 
-     stride = GST_VIDEO_FRAME_PLANE_STRIDE( &frame, 0);
-     width = GST_VIDEO_INFO_WIDTH( vinfo); 
+     stride_y = GST_VIDEO_FRAME_PLANE_STRIDE( &frame, 0);
+     stride_u = GST_VIDEO_FRAME_PLANE_STRIDE( &frame, 1);
+     stride_v = GST_VIDEO_FRAME_PLANE_STRIDE( &frame, 2); 
+
+     width  = GST_VIDEO_INFO_WIDTH( vinfo); 
      height = GST_VIDEO_INFO_HEIGHT( vinfo); 
 
-	/* 
-        g_print("We have a stride: %d\n",stride );
-	g_print("We have a width: %d\n",width );
-	g_print("We have a height: %d\n",height ); 
-        */ 
+     gint width_y = GST_VIDEO_FRAME_COMP_WIDTH( &frame, 0);
+     gint height_y = GST_VIDEO_FRAME_COMP_HEIGHT( &frame, 0);
+
+     gint width_u = GST_VIDEO_FRAME_COMP_WIDTH( &frame, 1);
+     gint height_u = GST_VIDEO_FRAME_COMP_HEIGHT( &frame, 1);
+
+     gint width_v = GST_VIDEO_FRAME_COMP_WIDTH( &frame, 2);
+     gint height_v = GST_VIDEO_FRAME_COMP_HEIGHT( &frame, 2); 
+     
+	 
+     /*   g_print("We have a stride_y: %d\n",stride_y );
+        g_print("We have a stride_u: %d\n",stride_u );
+        g_print("We have a stride_v: %d\n",stride_v );
+
+	g_print("We have a width_y: %d\n",width_y );
+	g_print("We have a width_u: %d\n",width_u );
+	g_print("We have a width_v: %d\n",width_v );
+
+	g_print("We have a height_y: %d\n",height_y ); 
+	g_print("We have a height_u: %d\n",height_u ); 
+	g_print("We have a height_v: %d\n",height_v );  */
+         
         float sigma = filter->sigma;
         float epsilon = filter->epsilon;	
         
 
 
 
-        void *filter = SimdGaussianBlurInit( (size_t) width ,(size_t) height ,(size_t) 3 ,&sigma ,&epsilon);
+        void *filter_y = SimdGaussianBlurInit( (size_t) width_y ,(size_t) height_y ,(size_t) 1 ,&sigma ,&epsilon);
+        void *filter_u = SimdGaussianBlurInit( (size_t) width_u ,(size_t) height_u ,(size_t) 1 ,&sigma ,&epsilon);
+        void *filter_v = SimdGaussianBlurInit( (size_t) width_v ,(size_t) height_v ,(size_t) 1 ,&sigma ,&epsilon);
+
         
-	SimdGaussianBlurRun( filter,pixels_y ,(size_t) stride , pixels_y ,(size_t) stride);	   
-	SimdGaussianBlurRun( filter,pixels_u ,(size_t) stride , pixels_u ,(size_t) stride);	   
-	SimdGaussianBlurRun( filter,pixels_v ,(size_t) stride , pixels_v ,(size_t) stride);	   
+	SimdGaussianBlurRun( filter_y,pixels_y ,(size_t) stride_y , pixels_y ,(size_t) stride_y);	  
+        SimdGaussianBlurRun( filter_u,pixels_u ,(size_t) stride_u , pixels_u ,(size_t) stride_u);	   
+        SimdGaussianBlurRun( filter_v,pixels_v ,(size_t) stride_v , pixels_v ,(size_t) stride_v);
 
 
 	/*for( h = 0; h < height; ++h){
